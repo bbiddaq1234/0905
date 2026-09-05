@@ -21,7 +21,7 @@
 <body>
     <div class="absolute top-4 left-4 z-10 text-white/80 pointer-events-none drop-shadow-md">
         <h1 class="text-2xl font-bold text-yellow-400">🎆 100가지 모양 불꽃놀이</h1>
-        <p class="text-sm mt-1">화면을 클릭하면 여러 발의 화려한 불꽃이 동시에 터집니다!</p>
+        <p class="text-sm mt-1">화면을 클릭하면 다양한 크기와 모양의 불꽃이 웅장하게 터집니다!</p>
         <p id="shape-counter" class="text-xs mt-2 text-cyan-300 font-mono">현재 발사된 모양: 멀티 불꽃 연출</p>
     </div>
 
@@ -40,7 +40,7 @@
             }
         }
 
-        // 로켓 발사 휘파람/상승음 효과
+        // 로켓 발사 휘파람/상승음 효과 (속도 조절에 맞춰 호흡을 늘림)
         function playLaunchSound() {
             if (!audioCtx) return;
             try {
@@ -48,21 +48,21 @@
                 const gain = audioCtx.createGain();
 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.5);
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.8);
 
-                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.005, audioCtx.currentTime + 0.8);
 
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
 
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
+                osc.stop(audioCtx.currentTime + 0.8);
             } catch (e) {}
         }
 
-        // 웅장한 폭발음 효과 (노이즈 버스트 + 저주파 붐)
+        // 웅장한 폭발음 효과 (크기에 따른 볼륨/필터 조절)
         function playExplosionSound(scale) {
             if (!audioCtx) return;
             try {
@@ -79,20 +79,20 @@
 
                 const filter = audioCtx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(300 * (scale || 1), audioCtx.currentTime);
-                filter.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 1.2);
+                filter.frequency.setValueAtTime(250 * scale, audioCtx.currentTime);
+                filter.frequency.linearRampToValueAtTime(25, audioCtx.currentTime + 1.5);
 
                 const gain = audioCtx.createGain();
-                const volume = Math.min(0.25 * (scale || 1), 0.5);
+                const volume = Math.min(0.2 * scale, 0.5);
                 gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
 
                 noise.connect(filter);
                 filter.connect(gain);
                 gain.connect(audioCtx.destination);
 
                 noise.start();
-                noise.stop(audioCtx.currentTime + 1.2);
+                noise.stop(audioCtx.currentTime + 1.5);
             } catch (e) {}
         }
 
@@ -206,12 +206,17 @@
                     this.coordinates.push([this.x, this.y]);
                 }
                 this.angle = Math.atan2(targetY - startY, targetX - startX);
-                this.speed = 12 + Math.random() * 4;
-                this.acceleration = 1.05;
+                
+                // [속도 수정] 너무 빠르게 확 올라가지 않고 우아하게 올라가도록 속도를 낮춤
+                this.speed = 6 + Math.random() * 2; 
+                this.acceleration = 1.03;
                 this.brightness = Math.random() * 50 + 50;
                 this.shapeId = shapeId;
                 this.hue = Math.random() * 360;
-                this.scale = Math.random() * 1.3 + 0.5;
+
+                // [크기 수정] 명확히 3단계(작은 크기, 중간 크기, 큰 크기) 중 하나로 선택
+                const sizeTiers = [0.6, 1.1, 1.8]; // 소, 중, 대
+                this.scale = sizeTiers[Math.floor(Math.random() * sizeTiers.length)];
 
                 playLaunchSound();
             }
@@ -254,19 +259,20 @@
                     this.coordinates.push([this.x, this.y]);
                 }
                 
-                const speedMod = (Math.random() * 0.4 + 0.8) * scale;
+                const speedMod = (Math.random() * 0.3 + 0.85) * scale;
                 this.vx = offsetX * speedMod * 0.12;
                 this.vy = offsetY * speedMod * 0.12;
                 
-                this.vx += (Math.random() - 0.5) * 0.8;
-                this.vy += (Math.random() - 0.5) * 0.8;
+                this.vx += (Math.random() - 0.5) * 0.6;
+                this.vy += (Math.random() - 0.5) * 0.6;
 
-                this.friction = 0.95;
-                this.gravity = 0.3;
+                this.friction = 0.94;
+                this.gravity = 0.22;
                 this.hue = hue + Math.random() * 30 - 15;
                 this.brightness = Math.random() * 50 + 50;
                 this.alpha = 1;
-                this.decay = Math.random() * 0.015 + 0.01;
+                // 큰 불꽃은 좀 더 오래 남고, 작은 불꽃은 빠르게 사라짐
+                this.decay = (Math.random() * 0.01 + 0.008) / Math.sqrt(scale);
             }
 
             update(index) {
@@ -327,25 +333,23 @@
 
             initAudio();
 
-            // 3발에서 5발 사이의 랜덤 개수 결정
-            const fireworkCount = Math.floor(Math.random() * 3) + 3; // 3, 4, 5 중 하나
+            const fireworkCount = Math.floor(Math.random() * 3) + 3; // 3, 4, 5발
 
             for (let i = 0; i < fireworkCount; i++) {
                 shapeIndex = (shapeIndex + 1) % 100;
                 
-                // 클릭한 지점 주변으로 약간씩 분산된 위치로 목표 지정
-                const offsetX = (Math.random() - 0.5) * 150;
-                const offsetY = (Math.random() - 0.5) * 100;
+                const offsetX = (Math.random() - 0.5) * 180;
+                const offsetY = (Math.random() - 0.5) * 120;
                 
-                const startX = canvas.width / 2 + (Math.random() - 0.5) * 200;
+                const startX = canvas.width / 2 + (Math.random() - 0.5) * 250;
                 const startY = canvas.height;
-                const targetX = Math.max(50, Math.min(canvas.width - 50, e.clientX + offsetX));
-                const targetY = Math.max(50, Math.min(canvas.height - 100, e.clientY + offsetY));
+                const targetX = Math.max(60, Math.min(canvas.width - 60, e.clientX + offsetX));
+                const targetY = Math.max(60, Math.min(canvas.height - 120, e.clientY + offsetY));
 
                 fireworks.push(new Firework(startX, startY, targetX, targetY, shapeIndex));
             }
 
-            shapeCounter.innerText = `현재 발사된 불꽃: ${fireworkCount}발 동시 연출`;
+            shapeCounter.innerText = `현재 발사된 불꽃: ${fireworkCount}발 멀티 연출 (3단계 크기 적용)`;
         });
 
         animate();
