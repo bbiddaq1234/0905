@@ -21,8 +21,8 @@
 <body>
     <div class="absolute top-4 left-4 z-10 text-white/80 pointer-events-none drop-shadow-md">
         <h1 class="text-2xl font-bold text-yellow-400">🎆 100가지 모양 불꽃놀이</h1>
-        <p class="text-sm mt-1">화면을 클릭하여 소리와 함께 다양한 크기와 모양의 불꽃을 터뜨려보세요!</p>
-        <p id="shape-counter" class="text-xs mt-2 text-cyan-300 font-mono">현재 발사된 모양: 일반 원형 파열</p>
+        <p class="text-sm mt-1">화면을 클릭하면 여러 발의 화려한 불꽃이 동시에 터집니다!</p>
+        <p id="shape-counter" class="text-xs mt-2 text-cyan-300 font-mono">현재 발사된 모양: 멀티 불꽃 연출</p>
     </div>
 
     <canvas id="fireworksCanvas"></canvas>
@@ -51,7 +51,7 @@
                 osc.frequency.setValueAtTime(200, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.5);
 
-                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
                 gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
 
                 osc.connect(gain);
@@ -59,9 +59,7 @@
 
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.5);
-            } catch (e) {
-                // 오디오 재생 오류 방지
-            }
+            } catch (e) {}
         }
 
         // 웅장한 폭발음 효과 (노이즈 버스트 + 저주파 붐)
@@ -72,7 +70,6 @@
                 const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
                 const data = buffer.getChannelData(0);
 
-                // 화이트 노이즈 생성
                 for (let i = 0; i < bufferSize; i++) {
                     data[i] = Math.random() * 2 - 1;
                 }
@@ -80,14 +77,13 @@
                 const noise = audioCtx.createBufferSource();
                 noise.buffer = buffer;
 
-                // 필터로 묵직한 폭발음 질감 만들기
                 const filter = audioCtx.createBiquadFilter();
                 filter.type = 'lowpass';
                 filter.frequency.setValueAtTime(300 * (scale || 1), audioCtx.currentTime);
                 filter.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + 1.2);
 
                 const gain = audioCtx.createGain();
-                const volume = Math.min(0.3 * (scale || 1), 0.6);
+                const volume = Math.min(0.25 * (scale || 1), 0.5);
                 gain.gain.setValueAtTime(volume, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
 
@@ -134,7 +130,6 @@
 
         // 21~45: 하트, 별, 꽃잎 등 유기적 모양
         shapeGenerators.push(
-            // 하트 모양 1
             () => {
                 const pts = [];
                 for (let a = 0; a < Math.PI * 2; a += 0.05) {
@@ -144,7 +139,6 @@
                 }
                 return pts;
             },
-            // 나비 모양
             () => {
                 const pts = [];
                 for (let t = 0; t < Math.PI * 2; t += 0.05) {
@@ -153,7 +147,6 @@
                 }
                 return pts;
             },
-            // 별 모양 (5망성)
             () => {
                 const pts = [];
                 for (let i = 0; i < 100; i++) {
@@ -163,7 +156,6 @@
                 }
                 return pts;
             },
-            // 나선형 소용돌이
             () => {
                 const pts = [];
                 for (let i = 0; i < 80; i++) {
@@ -173,7 +165,6 @@
                 }
                 return pts;
             },
-            // 토러스 고리형
             () => {
                 const pts = [];
                 for (let i = 0; i < 80; i++) {
@@ -184,7 +175,6 @@
             }
         );
 
-        // 나머지 모양들을 프로그래밍 방식으로 100개 채우기
         for (let k = 46; k <= 100; k++) {
             shapeGenerators.push(() => {
                 const pts = [];
@@ -216,14 +206,13 @@
                     this.coordinates.push([this.x, this.y]);
                 }
                 this.angle = Math.atan2(targetY - startY, targetX - startX);
-                this.speed = 12;
+                this.speed = 12 + Math.random() * 4;
                 this.acceleration = 1.05;
                 this.brightness = Math.random() * 50 + 50;
                 this.shapeId = shapeId;
                 this.hue = Math.random() * 360;
                 this.scale = Math.random() * 1.3 + 0.5;
 
-                // 발사 사운드 재생
                 playLaunchSound();
             }
 
@@ -238,7 +227,6 @@
 
                 if (this.distanceTraveled >= this.distanceToTarget) {
                     createParticles(this.targetX, this.targetY, this.hue, this.shapeId, this.scale);
-                    // 폭발 사운드 재생 (스케일 크기에 연동)
                     playExplosionSound(this.scale);
                     fireworks.splice(index, 1);
                 } else {
@@ -333,21 +321,31 @@
             }
         }
 
+        // 마우스 클릭 시 3~5발 동시 발사
         window.addEventListener('click', (e) => {
             if (e.clientY < 90 && e.clientX < 300) return;
 
-            // 오디오 컨텍스트 초기화 (사용자 인터랙션 필수)
             initAudio();
 
-            shapeIndex = (shapeIndex + 1) % 100;
-            shapeCounter.innerText = `현재 발사된 모양: #${shapeIndex + 1} 패턴 불꽃`;
+            // 3발에서 5발 사이의 랜덤 개수 결정
+            const fireworkCount = Math.floor(Math.random() * 3) + 3; // 3, 4, 5 중 하나
 
-            const startX = canvas.width / 2;
-            const startY = canvas.height;
-            const targetX = e.clientX;
-            const targetY = e.clientY;
+            for (let i = 0; i < fireworkCount; i++) {
+                shapeIndex = (shapeIndex + 1) % 100;
+                
+                // 클릭한 지점 주변으로 약간씩 분산된 위치로 목표 지정
+                const offsetX = (Math.random() - 0.5) * 150;
+                const offsetY = (Math.random() - 0.5) * 100;
+                
+                const startX = canvas.width / 2 + (Math.random() - 0.5) * 200;
+                const startY = canvas.height;
+                const targetX = Math.max(50, Math.min(canvas.width - 50, e.clientX + offsetX));
+                const targetY = Math.max(50, Math.min(canvas.height - 100, e.clientY + offsetY));
 
-            fireworks.push(new Firework(startX, startY, targetX, targetY, shapeIndex));
+                fireworks.push(new Firework(startX, startY, targetX, targetY, shapeIndex));
+            }
+
+            shapeCounter.innerText = `현재 발사된 불꽃: ${fireworkCount}발 동시 연출`;
         });
 
         animate();
